@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17161f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="百代目の勇者">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; touch-action: manipulation; overscroll-behavior-y: none; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>百代目の勇者</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: one narrow column like a handheld screen — status, arena, then a tabbed ledger; tab bar fixed at the bottom. Deliberately single dark theme (torch-lit dungeon). */
+:root {
+  color-scheme: dark;
+  --stone: #17161f;
+  --wall: #211f2c;
+  --wall-2: #2b2939;
+  --line: #3b384d;
+  --bone: #ebe3cf;
+  --dim: #9a94ad;
+  --torch: #f0a03c;
+  --torch-ink: #241606;
+  --gold: #e6c35c;
+  --soul: #b9a8ff;
+  --blood: #e0584f;
+  --moss: #8cc06c;
+  --pixel: "DotGothic16", "Hiragino Kaku Gothic ProN", "Noto Sans JP", monospace;
+  --body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+}
+html, body { height: 100%; }
+body {
+  background: var(--stone);
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
+}
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 12px calc(84px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+}
+.num { font-family: var(--pixel); font-variant-numeric: tabular-nums; }
+
+/* status row */
+.status { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.who { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.logo { width: 40px; height: 40px; image-rendering: crisp-edges; image-rendering: pixelated; background: var(--wall-2); border-radius: 8px; flex: none; }
+.tile canvas { width: 64px; height: 64px; image-rendering: crisp-edges; image-rendering: pixelated; display: block; }
+.who .gen { font-family: var(--pixel); color: var(--dim); font-size: 13px; letter-spacing: .06em; }
+.who .name { font-family: var(--pixel); font-size: 22px; line-height: 1.2; }
+.purse { display: flex; gap: 14px; }
+.purse div { display: flex; flex-direction: column; align-items: flex-end; }
+.purse small { font-size: 11px; color: var(--dim); letter-spacing: .08em; }
+.purse .g { color: var(--gold); font-size: 20px; }
+.purse .r { color: var(--soul); font-size: 20px; }
+
+/* arena */
+.arena {
+  background: var(--wall);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 14px;
+  position: relative; overflow: hidden;
+}
+.arena::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 28px 14px; opacity: .22;
+}
+.depth { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.depth .floor { font-family: var(--pixel); font-size: 44px; line-height: 1; color: var(--torch); text-shadow: 0 0 18px rgba(240,160,60,.35); }
+.depth .floor span { font-size: 22px; color: var(--dim); text-shadow: none; }
+.depth .best { font-size: 12px; color: var(--dim); text-align: right; }
+.depth .best b { font-family: var(--pixel); font-weight: 400; color: var(--bone); font-size: 15px; }
+
+.fight { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
+.side { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.tile {
+  width: 72px; height: 72px; display: grid; place-items: center;
+  font-family: var(--pixel); font-size: 44px; line-height: 1;
+  background: var(--wall-2); border: 2px solid var(--line); border-radius: 4px;
+  position: relative;
+}
+.tile.hero { color: var(--torch); border-color: var(--torch); }
+.tile.mon { color: var(--bone); }
+.tile.mon.boss { color: var(--blood); border-color: var(--blood); box-shadow: 0 0 0 3px var(--wall), 0 0 0 4px var(--blood); }
+.tile.hit { animation: hit .22s ease-out; }
+.tile.lunge-r { animation: lungeR .22s ease-out; }
+.tile.lunge-l { animation: lungeL .22s ease-out; }
+.tile.gone { animation: gone .3s ease-in forwards; }
+@keyframes hit { 30% { transform: translateX(-4px); filter: brightness(2); } 60% { transform: translateX(4px); } }
+@keyframes lungeR { 40% { transform: translateX(10px); } }
+@keyframes lungeL { 40% { transform: translateX(-10px); } }
+@keyframes gone { to { transform: scale(.6); opacity: 0; } }
+.vs { font-family: var(--pixel); color: var(--dim); font-size: 13px; }
+.label { font-size: 12px; color: var(--dim); text-align: center; max-width: 100%; overflow-wrap: anywhere; line-height: 1.3; min-height: 2.6em; }
+.label.boss { color: var(--blood); }
+.bar { width: 100%; height: 8px; background: var(--stone); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; transition: width .18s linear; }
+.bar.h i { background: var(--moss); }
+.bar.m i { background: var(--blood); }
+.hpnum { font-size: 11px; color: var(--dim); }
+.float {
+  position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  font-family: var(--pixel); font-size: 16px; pointer-events: none;
+  animation: float .8s ease-out forwards; white-space: nowrap;
+}
+.float.to-mon { color: var(--bone); }
+.float.to-hero { color: var(--blood); }
+@keyframes float { to { transform: translate(-50%, -28px); opacity: 0; } }
+.stats { position: relative; display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); gap: 8px; flex-wrap: wrap; }
+.stats b { font-family: var(--pixel); font-weight: 400; color: var(--bone); font-size: 14px; margin-left: 4px; }
+
+/* panels */
+.panel { display: flex; flex-direction: column; gap: 10px; }
+.panel h2 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 15px; color: var(--dim); letter-spacing: .1em; }
+.row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px;
+  padding: 10px 12px; background: var(--wall); border: 1px solid var(--line); border-radius: 6px;
+}
+.row .t { min-width: 0; }
+.row .t strong { font-weight: 700; font-size: 15px; }
+.row .t .lv { font-family: var(--pixel); color: var(--dim); font-size: 13px; margin-left: 6px; }
+.row .t p { margin: 2px 0 0; font-size: 12px; color: var(--dim); }
+button {
+  font: inherit; color: inherit; cursor: pointer; border: 0; background: none;
+}
+button:focus-visible { outline: 2px solid var(--torch); outline-offset: 2px; }
+.buy {
+  min-width: 92px; padding: 9px 12px; border-radius: 4px;
+  font-family: var(--pixel); font-size: 15px; font-variant-numeric: tabular-nums;
+  background: var(--torch); color: var(--torch-ink);
+  box-shadow: 0 3px 0 #9a5d17;
+}
+.buy.soul { background: var(--soul); color: #1b1433; box-shadow: 0 3px 0 #6a58b8; }
+.buy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #9a5d17; }
+.buy:disabled { background: var(--wall-2); color: var(--dim); box-shadow: 0 3px 0 var(--line); cursor: default; }
+.buy.done { background: transparent; color: var(--moss); box-shadow: none; border: 1px solid var(--line); }
+
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px; font-size: 14px; }
+.switch { width: 48px; height: 26px; border-radius: 13px; background: var(--wall-2); border: 1px solid var(--line); position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--dim); transition: transform .15s, background .15s; }
+.switch[aria-checked="true"] { background: #3b2a12; border-color: var(--torch); }
+.switch[aria-checked="true"]::after { transform: translateX(22px); background: var(--torch); }
+
+.retire {
+  width: 100%; padding: 11px; border-radius: 6px; border: 1px dashed var(--line); color: var(--dim); font-size: 14px;
+}
+.retire.armed { border: 1px solid var(--soul); color: var(--soul); background: rgba(185,168,255,.08); }
+
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.log li { color: var(--dim); padding: 3px 0; border-bottom: 1px solid var(--wall-2); overflow-wrap: anywhere; }
+.log li.boss { color: var(--torch); }
+.log li.death { color: var(--blood); }
+.log li.gen { color: var(--bone); }
+.hint { font-size: 12px; color: var(--dim); margin: 0; }
+
+.graves { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.grave {
+  background: var(--wall); border: 1px solid var(--line);
+  border-radius: 40px 40px 4px 4px; padding: 16px 10px 10px; text-align: center;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.grave .g1 { font-family: var(--pixel); font-size: 11px; color: var(--dim); }
+.grave .g2 { font-family: var(--pixel); font-size: 17px; }
+.grave .g3 { font-family: var(--pixel); color: var(--torch); font-size: 15px; }
+.grave .g4 { font-size: 11px; color: var(--dim); overflow-wrap: anywhere; line-height: 1.35; }
+.grave .g5 { font-family: var(--pixel); font-size: 12px; color: var(--soul); }
+.grave.retired { border-color: var(--soul); }
+.summary { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+.summary b { font-family: var(--pixel); font-weight: 400; color: var(--bone); font-size: 15px; margin-left: 4px; }
+
+/* tabs */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--wall); border-top: 1px solid var(--line);
+  padding: 6px 16px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+.tabs div { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tabs button { padding: 10px 4px; border-radius: 4px; font-family: var(--pixel); font-size: 16px; color: var(--dim); position: relative; }
+.tabs button[aria-selected="true"] { color: var(--torch); background: var(--stone); }
+.tabs .dot { position: absolute; top: 6px; right: calc(50% - 32px); width: 7px; height: 7px; border-radius: 50%; background: var(--soul); }
+
+/* away modal */
+.veil { position: fixed; inset: 0; z-index: 10; background: rgba(10,9,14,.78); display: grid; place-items: center; padding: 16px; }
+.card { width: 100%; max-width: 380px; background: var(--wall); border: 1px solid var(--torch); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 20px; color: var(--torch); }
+.card dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 14px; }
+.card dt { color: var(--dim); }
+.card dd { margin: 0; font-family: var(--pixel); font-size: 16px; text-align: right; }
+.card .ok { padding: 11px; border-radius: 4px; background: var(--torch); color: var(--torch-ink); font-family: var(--pixel); font-size: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile.hit, .tile.lunge-r, .tile.lunge-l, .tile.gone, .float { animation: none; }
+  .float { display: none; }
+  .bar i { transition: none; }
+}
+</style>
+
+
+</head>
+<body>
+<main class="app">
+  <header class="status">
+    <div class="who">
+      <canvas class="logo" id="logo" width="16" height="16" aria-hidden="true"></canvas>
+      <div>
+        <div class="gen num" id="gen">第1代</div>
+        <div class="name" id="hname">勇者</div>
+      </div>
+    </div>
+    <div class="purse">
+      <div><small>ゴールド</small><span class="g num" id="gold">0</span></div>
+      <div><small>遺品</small><span class="r num" id="relics">0</span></div>
+    </div>
+  </header>
+
+  <section class="arena" aria-label="戦闘">
+    <div class="depth">
+      <div class="floor" id="floor"><span>B</span>1<span>F</span></div>
+      <div class="best">最深到達<br><b id="best">B1F</b></div>
+    </div>
+    <div class="fight">
+      <div class="side">
+        <div class="tile hero" id="htile"><canvas id="hcv" width="16" height="16" aria-label="勇者"></canvas></div>
+        <div class="bar h"><i id="hbar"></i></div>
+        <div class="hpnum num" id="hhp">100 / 100</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="side">
+        <div class="tile mon" id="mtile"><canvas id="mcv" width="16" height="16" aria-label="魔物"></canvas></div>
+        <div class="bar m"><i id="mbar"></i></div>
+        <div class="label" id="mname">スライム</div>
+      </div>
+    </div>
+    <div class="stats">
+      <span>攻撃<b id="satk">10</b></span>
+      <span>防御<b id="sdef">3</b></span>
+      <span>撃破回復<b id="sheal">8%</b></span>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-run">
+    <h2>旅の支度</h2>
+    <div id="shop"></div>
+    <div class="toggle" id="autoRow" hidden>
+      <span>従者に装備を任せる</span>
+      <button class="switch" id="autoSw" role="switch" aria-checked="true" aria-label="自動購入"></button>
+    </div>
+    <button class="retire" id="retire">引退して遺品を残す</button>
+    <h2>冒険の記録</h2>
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <section class="panel" id="tab-altar" hidden>
+    <h2>祖霊の祭壇</h2>
+    <p class="hint">遺品は勇者が倒れても消えません。ここで捧げた力は、次の代からずっと受け継がれます。</p>
+    <div id="meta"></div>
+  </section>
+
+  <section class="panel" id="tab-graves" hidden>
+    <h2>勇者の墓地</h2>
+    <div class="summary" id="gsum"></div>
+    <div class="graves" id="graves"></div>
+  </section>
+</main>
+
+<nav class="tabs" role="tablist" aria-label="画面切り替え">
+  <div>
+    <button role="tab" aria-selected="true" data-tab="run">冒険</button>
+    <button role="tab" aria-selected="false" data-tab="altar">祭壇<i class="dot" id="altarDot" hidden></i></button>
+    <button role="tab" aria-selected="false" data-tab="graves">墓地</button>
+  </div>
+</nav>
+
+<div class="veil" id="away" hidden>
+  <div class="card" role="dialog" aria-labelledby="awayT">
+    <h3 id="awayT">留守のあいだに</h3>
+    <dl id="awayDl"></dl>
+    <button class="ok" id="awayOk">冒険に戻る</button>
+  </div>
+</div>
+
+<script>
+const SPRITES = {"hero":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","m":"#c9cedb","M":"#7d8296","s":"#f0c090","a":"#3f6fb8","A":"#2a4a80","b":"#5a3a22"},"rows":["................","....kkkkk.......","...kmmmmmk...k..","..kmmmmmmmk.kmk.","..kmkkkkkmk.kmk.","..kkssksskk.kmk.","...kssssk...kmk.","..kkkkkkkk..kmk.",".kaaaaaaaak.kmk.","kaAaaaaaaAakkyk.","ksAaaaaaaAksyyyk","kskaaaaaakk.kyk.",".kkAAAAAAk...k..","..kMk..kMk......","..kbk..kbk......","..kkk..kkk......"]},"slime":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#6cc04a","G":"#3e8a2c"},"rows":["................","................","................","................","................","......kkkk......","....kkggggkk....","...kgwggggwgk...","..kgwwggggwwgk..","..kggggggggggk..",".kgggkggggkgggk.",".kgggkggggkgggk.",".kggggggggggggk.",".kGggggggggggGk.","..kGGGGGGGGGGk..","...kkkkkkkkkk..."]},"rat":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#8a8494","G":"#5c5866","p":"#e8a0a8"},"rows":["................","................","................","................","................","..kk..kk........",".kpgkkpgk.......",".kgggggggkkkkk..","kgkgggggggggggk.","kggggggggggggggk",".kpgggggggggggGk","..kkgGgggggGGGk.","...kGkkGkkkGkkkk","...kk..kk...kpk.",".............kpk","..............k."]},"bat":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","p":"#7a5cb0","v":"#4a3470"},"rows":["................","................","................","................","................","......k..k......","......kkkk......","k....kppppk....k","kk...kppppk...kk","kvk..krpprk..kvk","kvvk.kppppk.kvvk","kvvvkkppppkkvvvk","kvvvvkppppkvvvvk",".kvkvkkppkkvkvk.","..k.k.kppk.k.k..","......kkkk......"]},"goblin":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#7cae4a","b":"#7a5232"},"rows":["................","................","....kkkkkkkk....","...kggggggggk...","kk.kggggggggk.kk","kgkgykggggkygkgk",".kggggggggggggk.","..kgggwkkwgggk..","...kggggggggk...","...kkkkkkkkkk...","..kbbbbbbbbbbk..",".kgkbbbbbbbbkgk.",".kgkbbbbbbbbkgk.","..kkbbkkkkbbkk..","...kgk....kgk...","...kkk....kkk..."]},"skeleton":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a"},"rows":["................","....kkkkkkkk....","...kwwwwwwwwk...","..kwwwwwwwwwwk..","..kwkkwwwwkkwk..","..kwkkwwwwkkwk..","..kwwwwkkwwwwk..","...kwwwwwwwwk...","...kwkwkkwkwk...","....kkkkkkkk....","..kk.kwkkwk.kk..",".kwwkwwwwwwkwwk.","..kk.kwkkwk.kk..",".kwwkwwwwwwkwwk.","..kk.kwkkwk.kk..",".....kkkkkk....."]},"spider":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","p":"#6a5890","P":"#45385e","l":"#9a8cb8"},"rows":["................","................","................","................","................","................","................","l.....kkkk.....l",".l...kppppk...l.","..l.kppppppk.l..","ll.kpprpprppk.ll","..lkppppppppkl..",".l.kpPppppPpk.l.","l.l.kPppppPk.l.l","..l..kppppk..l..",".l....kkkk....l."]},"orc":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","p":"#d29a8c","q":"#f0c0b4","a":"#6a4a30","A":"#4a3220"},"rows":["................","....kkkkkkkk....","..kkppppppppkk..",".kppkppppppkppk.",".kpkppppppppkpk.","..kppkppppkppk..","..kpppkkkkpppk..","..kppkqkkqkppk..","..kpppkkkkpppk..","...kwppppppwk...","...kkkkkkkkkk...",".kkaaaaaaaaaakk.","kpkaaAaaaaAaakpk","kpkaaaaaaaaaakpk",".kkaaaaaaaaaakk.","..kkkkkkkkkkkk.."]},"mimic":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","b":"#9a6a3a"},"rows":["................","................","................","...kkkkkkkkkk...","..kbbbbbbbbbbk..",".kbbbbbbbbbbbbk.",".kyyyyyyyyyyyyk.",".kkkkkkkkkkkkkk.",".kwkwkwkkwkwkwk.",".krrrrrrrrrrrrk.",".kwkwkwkkwkwkwk.",".kkkkkkkkkkkkkk.",".kbbbbyyyybbbbk.",".kbbbbykkybbbbk.",".kbbbbbbbbbbbbk.","..kkkkkkkkkkkk.."]},"lizard":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#4fae8f","G":"#2f7a62","c":"#e8dca0"},"rows":["................","................","...kkkkkkkkkk...","..kggggggggggk..",".kgyykggggkyygk.",".kggggggggggggk.","..kggggggggggk..","..kGkkkkkkkkGk..","...kggggggggk...","..kgkcccccckgk..",".kgkcccccccckgk.",".kgkcccccccckgk.","..kkcccccccckk..","...kgkkggkkgk...","..kggk.kk.kggk..","..kkkk....kkkk.."]},"wolf":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#8a7462","G":"#5e4e40","c":"#d8c8b0"},"rows":["................","..k..........k..","..kk........kk..","..kgk......kgk..","..kggkkkkkkggk..",".kggggggggggggk.",".kgyykggggkyygk.",".kggggggggggggk.","..kgggccccgggk..","...kgcckkccgk...","...kkwrrrrwkk...","....kkkkkkkk....",".kggggggggggggk.","kgggggGGGGgggggk","kggggGGGGGGggggk","kkkkkkkkkkkkkkkk"]},"golem":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","s":"#9a8f80","S":"#6e6458","c":"#6fe0e8"},"rows":["................","....kkkkkkkk....","...kssssssssk...","...kscsssscsk...","...kssssssssk...",".kkkkkkkkkkkkkk.","kssskSssssSksssk","kssskssssssksssk","ksSskssSSssksSsk","kssskSssssSksssk","kssskkkkkkkksssk",".kk..kssssk..kk.","....kssssssk....","....kSssssSk....","...kssssssssk...","...kkkkkkkkkk..."]},"ghost":{"pal":{"k":"#1a1420","w":"#dfe6ff","y":"#e6c35c","r":"#d8443a"},"rows":["................","................","....kkkkkkkk....","...kwwwwwwwwk...","..kwwwwwwwwwwk..","..kwkkwwwwkkwk..","..kwkkwwwwkkwk..",".kwwwwwwwwwwwwk.",".kwwwwwkkwwwwwk.",".kwwwwwwwwwwwwk.","kwwwwwwwwwwwwwwk","kwwwwwwwwwwwwwwk","kwwwwwwwwwwwwwwk","kwkwwkwwwwkwwkwk","k.kwk.kwwk.kwk.k","...k...kk...k..."]},"knight":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","d":"#4a4e66","D":"#7a7f9a"},"rows":["................","....kkkkkkkk....","...kddddddddk...","..kddDddddDddk..","..kdkkkkkkkkdk..","..kdkrrrrrrkdk..","..kdkkkkkkkkdk..","..kddddddddddk..","...kddddddddk...",".kkkkkkkkkkkkkk.","kdDdddDddDdddDdk","kdkdddDddDdddkdk","kdkddddddddddkdk",".kk.kddddddk.kk.","....kdkkkkdk....","....kkk..kkk...."]},"wyvern":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","o":"#d0702c","v":"#a33a2a","c":"#f0d090"},"rows":["................","................","k..............k","kvk..........kvk","kvvk..kkkk..kvvk","kvvvkkooookkvvvk","kvvvkyooooykvvvk","kvvvkooooookvvvk","kvvkooooooookvvk","kvk.kooccook.kvk","kk..koccccok..kk","k...koccccok...k","....kooccook....","...kok.kk.kok...","...kk......kk...","................"]},"lich":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#7cf08a","p":"#5c3a8a","P":"#3e2660"},"rows":["................","...kykykkykyk...","...kyyyyyyyyk...","...kwwwwwwwwk...","..kwgkwwwwkgwk..","..kwwwwwwwwwwk..","...kwkwkkwkwk...","..kppkkkkkkppk..",".kppppppppppppk.",".kpppPppppPpppk.","kwkppPppppPppkwk","k.kppPppppPppk.k","..kppPppppPppk..",".kppppPppPppppk.",".kppppppppppppk.",".kkkkkkkkkkkkkk."]},"dragon":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#c8382e","R":"#8a2420"},"rows":["................","k..............k","kk............kk",".kk..kkkkkk..kk.","..kkkrrrrrrkkk..","..krrrrrrrrrrk..",".krrykrrrrkyrrk.",".krrrrrrrrrrrrk.","..krrrrrrrrrrk..","...krrrrrrrrk...","...krrkrrkrrk...","....kwrrrrwk....","....kkkkkkkk....","....kRrrrrRk....","...kRrrrrrrRk...","...kkkkkkkkkk..."]},"icon":{"pal":{"k":"#1a1420","w":"#f2ecdc","y":"#e6c35c","r":"#d8443a","g":"#9590a8","G":"#625c74","m":"#dfe3ee","M":"#9aa0b4","d":"#3a3448","b":"#6a4426"},"rows":["...........kkk..","...........kyk..",".kkkkkk....kbk..","kggggggk...kbk..","kggGgggk.kyyyyyk","kgGGGgGk...kmk..","kggGggGk...kmk..","kggGggGk...kmk..","kgggggGk...kmk..","kggggGGk...kmk..","kgGgggGk...kMk..","kggggGGk...kMk..","kgggggGk...kMk..","kddddddddddkdkd.","kddddddddddddddk","kkkkkkkkkkkkkkkk"]}};
+// ===== core: pure game logic (no DOM) =====
+const NAMES = ['タロウ','ジロウ','ハナコ','ケンタ','ユウキ','サクラ','ゴンベエ','ミノル','アカネ','ソウタ','ヒナ','トメキチ','リン','カエデ','マサル','ポチ','ツバキ','ゲン','モモ','イサム'];
+const MONS = [['スライム','slime'],['大ネズミ','rat'],['コウモリ','bat'],['ゴブリン','goblin'],['骸骨兵','skeleton'],['毒蜘蛛','spider'],['オーク','orc'],['ミミック','mimic'],['リザードマン','lizard'],['人狼','wolf'],['ゴーレム','golem'],['亡霊','ghost'],['闇の騎士','knight'],['ワイバーン','wyvern'],['リッチ','lich'],['ドラゴン','dragon']];
+const REALMS = ['', '深淵の', '冥府の', '虚無の', '終焉の'];
+const TICK_BASE = 700;
+
+const SHOP = {
+  sword: { name: '剣を鍛える', unit: '攻撃 ×1.15', cost: lv => 8 * Math.pow(1.17, lv) },
+  armor: { name: '鎧を繕う', unit: '体力 ×1.12・防御 ×1.15', cost: lv => 10 * Math.pow(1.17, lv) },
+  herb:  { name: '薬草を買う', unit: '撃破後の回復 +3%', cost: lv => 20 * Math.pow(1.35, lv) },
+};
+const META = {
+  atk:    { name: '祖先の剣', desc: '代々の攻撃 ×1.15', cost: lv => 5 * Math.pow(1.6, lv) },
+  hp:     { name: '祖先の鎧', desc: '代々の体力・防御 ×1.15', cost: lv => 5 * Math.pow(1.6, lv) },
+  auto:   { name: '従者を雇う', desc: '装備を自動で買ってくれる', cost: () => 8, max: 1 },
+  gold:   { name: '墓守の加護', desc: '拾うゴールド ×1.2', cost: lv => 6 * Math.pow(1.65, lv) },
+  legacy: { name: '遺産の袋', desc: '旅立ちの所持金が増える', cost: lv => 8 * Math.pow(2, lv) },
+  relic:  { name: '弔いの鐘', desc: '手に入る遺品 ×1.15', cost: lv => 10 * Math.pow(1.7, lv) },
+  speed:  { name: '早足の靴', desc: '冒険の速さ ×1.14', cost: lv => 15 * Math.pow(2.4, lv), max: 6 },
+};
+
+function rnd() { return Math.random(); }
+function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+
+function newState() {
+  return { v: 1, gen: 0, relics: 0, best: 0, kills: 0,
+    meta: { atk: 0, hp: 0, auto: 0, gold: 0, legacy: 0, relic: 0, speed: 0 },
+    autoOn: true, graves: [], log: [], hero: null, mon: null, t: Date.now() };
+}
+function tickMs(s) { return TICK_BASE * Math.pow(0.877, s.meta.speed); }
+function legacyGold(s) { return s.meta.legacy ? Math.round(20 * Math.pow(1.7, s.meta.legacy - 1)) : 0; }
+function relicMult(s) { return Math.pow(1.15, s.meta.relic); }
+function goldMult(s) { return Math.pow(1.2, s.meta.gold); }
+function relicGain(s, maxF, retired) {
+  const base = Math.pow(Math.max(0, maxF - 1), 1.6) / 12;
+  return Math.floor(base * relicMult(s) * (retired ? 1.25 : 1));
+}
+function heroStats(s) {
+  const h = s.hero, m = s.meta;
+  const ma = Math.pow(1.15, m.atk), mh = Math.pow(1.15, m.hp);
+  return {
+    atk: 10 * Math.pow(1.15, h.sword) * ma,
+    maxHp: 100 * Math.pow(1.12, h.armor) * mh,
+    def: 3 * Math.pow(1.15, h.armor) * mh,
+    heal: Math.min(1, 0.08 + 0.03 * h.herb),
+  };
+}
+function makeMon(f) {
+  const boss = f % 10 === 0;
+  const band = Math.floor((f - 1) / 3) % MONS.length;
+  const cycle = Math.floor((f - 1) / (3 * MONS.length));
+  const [nm, sp] = MONS[Math.min(MONS.length - 1, band + (rnd() < 0.35 ? 1 : 0))];
+  const realm = cycle < REALMS.length ? REALMS[cycle] : `第${cycle + 1}圏の`;
+  const g = f - 1;
+  let hp = 18 * Math.pow(1.14, g), atk = 5 * Math.pow(1.115, g), def = 1.5 * Math.pow(1.115, g);
+  if (boss) { hp *= 4; atk *= 1.4; def *= 1.2; }
+  return { name: (boss ? '番人' : '') + realm + nm, sp, boss, hp, maxHp: hp, atk, def, cycle };
+}
+function dmg(a, d) { return a * a / (a + d) * (0.9 + 0.2 * rnd()); }
+
+function pushLog(s, text, kind, quiet) {
+  if (quiet) return;
+  s.log.unshift({ text, kind });
+  if (s.log.length > 30) s.log.length = 30;
+}
+function newHero(s, quiet) {
+  s.gen++;
+  s.hero = { name: pick(NAMES), gen: s.gen, floor: 1, maxF: 1, gold: legacyGold(s), sword: 0, armor: 0, herb: 0, hp: 0 };
+  s.hero.hp = heroStats(s).maxHp;
+  s.mon = makeMon(1);
+  pushLog(s, `第${s.gen}代 ${s.hero.name}が旅立った`, 'gen', quiet);
+  autoBuy(s);
+}
+function shopCost(s, k) { return Math.ceil(SHOP[k].cost(s.hero[k])); }
+function buyShop(s, k) {
+  const c = shopCost(s, k);
+  if (s.hero.gold < c) return false;
+  const before = heroStats(s).maxHp;
+  s.hero.gold -= c; s.hero[k]++;
+  if (k === 'armor') s.hero.hp += heroStats(s).maxHp - before;
+  return true;
+}
+function autoBuy(s) {
+  if (!s.meta.auto || !s.autoOn) return;
+  for (let i = 0; i < 200; i++) {
+    let best = null;
+    for (const k of ['sword', 'armor', 'herb']) {
+      let c = shopCost(s, k);
+      if (k === 'herb' && s.hero.herb >= 10) continue;
+      if (!best || c < best.c) best = { k, c };
+    }
+    if (!best || !buyShop(s, best.k)) break;
+  }
+}
+function metaCost(s, k) { return Math.ceil(META[k].cost(s.meta[k])); }
+function metaMaxed(s, k) { return META[k].max != null && s.meta[k] >= META[k].max; }
+function buyMeta(s, k) {
+  if (metaMaxed(s, k)) return false;
+  const c = metaCost(s, k);
+  if (s.relics < c) return false;
+  s.relics -= c; s.meta[k]++;
+  if (k === 'hp' && s.hero) s.hero.hp *= 1.15;
+  if (k === 'auto') { s.autoOn = true; autoBuy(s); }
+  return true;
+}
+function endHero(s, retired, quiet, sum) {
+  const h = s.hero;
+  const gain = relicGain(s, h.maxF, retired);
+  s.relics += gain;
+  s.graves.unshift({ gen: h.gen, name: h.name, floor: h.maxF, cause: retired ? '' : s.mon.name, retired, relics: gain });
+  if (s.graves.length > 80) s.graves.length = 80;
+  pushLog(s, retired ? `${h.name}は B${h.maxF}F で引退した（遺品 +${gain}）` : `${h.name}は B${h.floor}F で${s.mon.name}に倒れた（遺品 +${gain}）`, 'death', quiet);
+  if (sum) { sum.deaths++; sum.relics += gain; }
+  newHero(s, quiet);
+}
+// one combat round; ev collects visual events
+function tick(s, ev, quiet, sum) {
+  const h = s.hero, m = s.mon, st = heroStats(s);
+  const d1 = dmg(st.atk, m.def);
+  m.hp -= d1;
+  if (ev) ev.push({ who: 'mon', d: d1 });
+  if (m.hp <= 0) {
+    const f = h.floor;
+    let gold = Math.round((2 + f) * Math.pow(1.1, f - 1) * goldMult(s) * (m.boss ? 5 : 1));
+    h.gold += gold; s.kills++;
+    if (sum) { sum.kills++; sum.gold += gold; }
+    let extra = '';
+    if (m.boss) {
+      const r = Math.max(1, Math.floor(f / 8 * relicMult(s)));
+      s.relics += r; extra = `・遺品 +${r}`;
+      if (sum) sum.relics += r;
+    }
+    pushLog(s, `B${f}F ${m.name}を倒した（+${gold}G${extra}）`, m.boss ? 'boss' : 'kill', quiet);
+    h.hp = Math.min(st.maxHp, h.hp + st.heal * st.maxHp);
+    h.floor++;
+    if (h.floor > h.maxF) h.maxF = h.floor;
+    if (h.floor > s.best) { s.best = h.floor; if (sum) sum.best = s.best; }
+    s.mon = makeMon(h.floor);
+    if (ev) ev.push({ who: 'kill' });
+    autoBuy(s);
+    return;
+  }
+  const d2 = dmg(m.atk, st.def);
+  h.hp -= d2;
+  if (ev) ev.push({ who: 'hero', d: d2 });
+  if (h.hp <= 0) { if (ev) ev.push({ who: 'death' }); endHero(s, false, quiet, sum); }
+}
+function simulate(s, ms) {
+  const sum = { kills: 0, deaths: 0, gold: 0, relics: 0, best: s.best, startBest: s.best, ms };
+  let left = ms;
+  let guard = 0;
+  while (left >= tickMs(s) && guard++ < 200000) { left -= tickMs(s); tick(s, null, true, sum); }
+  return sum;
+}
+// ===== ui =====
+const KEY = 'hyakudaime-v1';
+const OFFLINE_CAP = 12 * 3600 * 1000;
+let S = null, acc = 0, last = Date.now(), armedUntil = 0, curTab = 'run', graveSig = '';
+const $ = id => document.getElementById(id);
+
+function fmt(n) {
+  n = Math.floor(Math.max(0, n));
+  if (n < 10000) return n.toLocaleString('ja-JP');
+  const units = [[1e20, '垓'], [1e16, '京'], [1e12, '兆'], [1e8, '億'], [1e4, '万']];
+  for (const [u, name] of units) {
+    if (n >= u) {
+      const v = n / u;
+      if (v >= 10000) return n.toExponential(2);
+      return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + name;
+    }
+  }
+}
+function fmtDur(ms) {
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+  return h ? `${h}時間${m % 60}分` : `${m}分`;
+}
+
+function save() {
+  if (!S) return;
+  S.t = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== 1 || !s.hero) return null;
+    const base = newState();
+    s.meta = Object.assign(base.meta, s.meta || {});
+    return s;
+  } catch (e) { return null; }
+}
+
+
+// ---- pixel sprites ----
+const TUNICS = [['#3f6fb8','#2a4a80'],['#b8483f','#80302a'],['#4f9a5a','#33683c'],['#a8723a','#704a22'],['#7a52b0','#523478'],['#c0a040','#806a24'],['#3a9aa0','#24686c'],['#c05a8a','#843c5e']];
+function drawSprite(cv, key, over) {
+  const sp = SPRITES[key] || SPRITES.slime;
+  const pal = over ? Object.assign({}, sp.pal, over) : sp.pal;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, 16, 16);
+  sp.rows.forEach((r, y) => {
+    for (let x = 0; x < 16; x++) {
+      const c = r[x];
+      if (c === '.') continue;
+      ctx.fillStyle = pal[c];
+      ctx.fillRect(x, y, 1, 1);
+    }
+  });
+}
+function monKey(m) {
+  if (m.sp) return m.sp;
+  const hit = MONS.find(([n]) => m.name.indexOf(n) >= 0);
+  return hit ? hit[1] : 'slime';
+}
+let drawnHero = -1, drawnMon = null;
+function drawActors() {
+  const h = S.hero, m = S.mon;
+  if (drawnHero !== h.gen) {
+    const t = TUNICS[h.gen % TUNICS.length];
+    drawSprite($('hcv'), 'hero', { a: t[0], A: t[1] });
+    drawnHero = h.gen;
+  }
+  if (drawnMon !== m) {
+    const cv = $('mcv');
+    drawSprite(cv, monKey(m));
+    const cyc = m.cycle || 0;
+    cv.style.filter = cyc ? `hue-rotate(${cyc * 75}deg) saturate(1.15)` : '';
+    drawnMon = m;
+  }
+}
+
+// ---- static rows ----
+function buildShop() {
+  const box = $('shop');
+  box.innerHTML = '';
+  for (const k of Object.keys(SHOP)) {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = `<div class="t"><strong>${SHOP[k].name}</strong><span class="lv" id="lv-${k}"></span><p>${SHOP[k].unit}</p></div>
+      <button class="buy" id="buy-${k}"></button>`;
+    box.appendChild(r);
+    r.querySelector('button').addEventListener('click', () => { if (buyShop(S, k)) { render(); } });
+  }
+}
+function buildMeta() {
+  const box = $('meta');
+  box.innerHTML = '';
+  for (const k of Object.keys(META)) {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = `<div class="t"><strong>${META[k].name}</strong><span class="lv" id="mlv-${k}"></span><p>${META[k].desc}</p></div>
+      <button class="buy soul" id="mbuy-${k}"></button>`;
+    box.appendChild(r);
+    r.querySelector('button').addEventListener('click', () => { if (buyMeta(S, k)) { save(); render(); } });
+  }
+}
+
+// ---- render ----
+function render() {
+  const h = S.hero, m = S.mon, st = heroStats(S);
+  $('gen').textContent = `第${h.gen}代`;
+  $('hname').textContent = `勇者${h.name}`;
+  $('gold').textContent = fmt(h.gold);
+  $('relics').textContent = fmt(S.relics);
+  $('floor').innerHTML = `<span>B</span>${h.floor}<span>F</span>`;
+  $('best').textContent = `B${S.best || 1}F`;
+  $('hbar').style.width = Math.max(0, h.hp / st.maxHp * 100) + '%';
+  $('hhp').textContent = `${fmt(Math.max(0, h.hp))} / ${fmt(st.maxHp)}`;
+  const mt = $('mtile');
+  drawActors();
+  mt.classList.toggle('boss', m.boss);
+  $('mbar').style.width = Math.max(0, m.hp / m.maxHp * 100) + '%';
+  const ml = $('mname');
+  ml.textContent = m.name;
+  ml.classList.toggle('boss', m.boss);
+  $('satk').textContent = fmt(st.atk);
+  $('sdef').textContent = fmt(st.def);
+  $('sheal').textContent = Math.round(st.heal * 100) + '%';
+
+  for (const k of Object.keys(SHOP)) {
+    $('lv-' + k).textContent = 'Lv' + h[k];
+    const b = $('buy-' + k), c = shopCost(S, k);
+    b.textContent = fmt(c) + 'G';
+    b.disabled = h.gold < c;
+  }
+  let canMeta = false;
+  for (const k of Object.keys(META)) {
+    const b = $('mbuy-' + k), maxed = metaMaxed(S, k);
+    $('mlv-' + k).textContent = META[k].max === 1 ? '' : 'Lv' + S.meta[k] + (maxed ? ' 最大' : '');
+    if (maxed) { b.textContent = META[k].max === 1 ? '雇用済' : '最大'; b.disabled = true; b.classList.add('done'); continue; }
+    const c = metaCost(S, k);
+    b.classList.remove('done');
+    b.textContent = fmt(c) + ' 遺品';
+    b.disabled = S.relics < c;
+    if (!b.disabled) canMeta = true;
+  }
+  $('altarDot').hidden = !canMeta;
+
+  $('autoRow').hidden = !S.meta.auto;
+  $('autoSw').setAttribute('aria-checked', String(!!S.autoOn));
+
+  const rb = $('retire');
+  if (Date.now() < armedUntil) {
+    rb.classList.add('armed');
+    rb.textContent = `もう一度押すと引退（遺品 +${fmt(relicGain(S, h.maxF, true))}）`;
+  } else {
+    rb.classList.remove('armed');
+    rb.textContent = `引退して遺品を残す（いま +${fmt(relicGain(S, h.maxF, true))}）`;
+  }
+
+  const log = $('log');
+  log.innerHTML = S.log.slice(0, 14).map(l => `<li class="${l.kind}">${l.text}</li>`).join('');
+
+  if (curTab === 'graves') renderGraves();
+}
+function renderGraves() {
+  const sig = S.graves.length + ':' + (S.graves[0] ? S.graves[0].gen : 0);
+  $('gsum').innerHTML = `<span>歴代の勇者<b>${S.gen - 1}人</b></span><span>倒した魔物<b>${fmt(S.kills)}</b></span><span>最深<b>B${S.best || 1}F</b></span>`;
+  if (sig === graveSig) return;
+  graveSig = sig;
+  const g = $('graves');
+  if (!S.graves.length) { g.innerHTML = '<p class="hint">まだ誰も眠っていません。</p>'; return; }
+  g.innerHTML = S.graves.map(x => `<div class="grave${x.retired ? ' retired' : ''}">
+    <span class="g1">第${x.gen}代</span><span class="g2">${x.name}</span><span class="g3">B${x.floor}F</span>
+    <span class="g4">${x.retired ? '天寿をまっとうし引退' : x.cause + 'に倒れる'}</span><span class="g5">遺品 +${fmt(x.relics)}</span></div>`).join('');
+}
+
+// ---- animation ----
+function restart(el, cls) {
+  el.classList.remove('hit', 'lunge-r', 'lunge-l', 'gone');
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+function floatNum(tile, text, cls) {
+  const side = tile.parentElement;
+  if (side.querySelectorAll('.float').length > 3) return;
+  const f = document.createElement('span');
+  f.className = 'float ' + cls;
+  f.textContent = text;
+  side.appendChild(f);
+  setTimeout(() => f.remove(), 820);
+}
+function animate(ev) {
+  const ht = $('htile'), mt = $('mtile');
+  for (const e of ev) {
+    if (e.who === 'mon') { restart(ht, 'lunge-r'); restart(mt, 'hit'); floatNum(mt, '-' + fmt(e.d), 'to-mon'); }
+    if (e.who === 'hero') { restart(mt, 'lunge-l'); restart(ht, 'hit'); floatNum(ht, '-' + fmt(e.d), 'to-hero'); }
+    if (e.who === 'kill') restart(mt, 'gone');
+    if (e.who === 'death') restart(ht, 'gone');
+  }
+}
+
+// ---- away ----
+function showAway(sum) {
+  if (sum.kills === 0 && sum.deaths === 0) return;
+  const rows = [
+    ['留守の時間', fmtDur(sum.ms) + (sum.capped ? '（上限）' : '')],
+    ['倒した魔物', fmt(sum.kills) + '体'],
+    ['倒れた勇者', sum.deaths + '人'],
+    ['手に入れた遺品', '+' + fmt(sum.relics)],
+  ];
+  if (sum.best > sum.startBest) rows.push(['最深到達', `B${sum.startBest}F → B${sum.best}F`]);
+  $('awayDl').innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  $('away').hidden = false;
+}
+function catchUp(ms) {
+  const capped = ms > OFFLINE_CAP;
+  const sum = simulate(S, Math.min(ms, OFFLINE_CAP));
+  sum.capped = capped;
+  pushLog(S, `留守中に ${fmt(sum.kills)}体を倒した`, 'gen', false);
+  save();
+  showAway(sum);
+}
+
+// ---- loop ----
+function loop() {
+  const now = Date.now();
+  const dt = now - last;
+  last = now;
+  if (dt > 20000) { acc = 0; catchUp(dt); render(); return; }
+  acc += dt;
+  let ev = null;
+  while (acc >= tickMs(S)) {
+    acc -= tickMs(S);
+    ev = [];
+    tick(S, ev, false, null);
+  }
+  if (ev) { animate(ev); render(); }
+  else if (armedUntil && now > armedUntil) { armedUntil = 0; render(); }
+}
+
+function setTab(t) {
+  curTab = t;
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+  $('tab-run').hidden = t !== 'run';
+  $('tab-altar').hidden = t !== 'altar';
+  $('tab-graves').hidden = t !== 'graves';
+  if (t === 'graves') { graveSig = ''; renderGraves(); }
+}
+
+let started = false;
+function start(data) {
+  if (started) return;
+  started = true;
+  S = (data && data.state) || load();
+  let away = 0;
+  if (!S) { S = newState(); newHero(S, false); }
+  else if (!(data && data.state)) away = Date.now() - (S.t || Date.now());
+  buildShop(); buildMeta();
+  drawSprite($('logo'), 'icon');
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  $('autoSw').addEventListener('click', () => { S.autoOn = !S.autoOn; autoBuy(S); render(); });
+  $('retire').addEventListener('click', () => {
+    if (Date.now() < armedUntil) { armedUntil = 0; endHero(S, true, false, null); save(); }
+    else armedUntil = Date.now() + 4000;
+    render();
+  });
+  $('awayOk').addEventListener('click', () => { $('away').hidden = true; });
+  if (away > 60000) catchUp(away);
+  render();
+  last = Date.now();
+  setInterval(loop, 100);
+  setInterval(save, 5000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+  try { if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') window.claude.hot.snapshot(() => ({ state: S })); } catch (e) {}
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+</body>
+</html>
